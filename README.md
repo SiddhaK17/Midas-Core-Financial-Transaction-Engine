@@ -196,6 +196,124 @@ Successful validation confirmed that the development environment is fully operat
 
 ---
 
+## Phase 2 — Event-Driven Transaction Ingestion & Kafka Integration
+
+With the foundational infrastructure successfully established, the next phase focused on introducing an event-driven communication model capable of supporting high-volume financial transaction workflows. Rather than allowing transaction producers and backend services to communicate directly, the architecture was extended with Apache Kafka, creating a resilient messaging layer that separates event generation from event processing.
+
+In modern financial platforms, transaction traffic is rarely predictable. User activity, market fluctuations, batch operations, and system integrations can generate sudden bursts of events that would quickly overwhelm a tightly coupled architecture. To address this challenge, Midas Core adopts a message-driven approach where transactions are first published to a distributed event stream before being consumed and processed by backend services.
+
+This architectural transition represents a significant milestone in the evolution of the platform, transforming the application from a static backend scaffold into an actively event-driven transaction processing service.
+
+### Why Kafka?
+
+Apache Kafka was selected as the messaging backbone due to its proven ability to handle large-scale event streams while maintaining reliability, durability, and horizontal scalability.
+
+Introducing Kafka provides several important architectural advantages:
+
+* **Service Decoupling** — Transaction producers and consumers can evolve independently without introducing direct dependencies between systems.
+* **Asynchronous Processing** — Events can be stored and processed independently of the rate at which they are produced, improving resilience during traffic spikes.
+* **Scalability** — Multiple producers and consumers can interact with the same event stream, simplifying horizontal scaling strategies.
+* **Fault Tolerance** — Events remain available within the broker even when downstream services experience temporary interruptions.
+* **Operational Flexibility** — Future services can subscribe to the same transaction stream without requiring changes to existing producers.
+
+By introducing a dedicated messaging layer, the platform establishes a foundation capable of supporting significantly more sophisticated transaction workflows in future development phases.
+
+### Event Ingestion Architecture
+
+The newly implemented ingestion layer enables Midas Core to subscribe to transaction events published to a Kafka topic and transform those events into strongly typed domain objects suitable for application-level processing.
+
+The resulting communication workflow follows the architecture below:
+
+```text
+External Transaction Producer
+                │
+                ▼
+      ┌─────────────────────┐
+      │    Apache Kafka     │
+      │   trader-updates    │
+      └──────────┬──────────┘
+                 │
+                 ▼
+      ┌─────────────────────┐
+      │  Kafka Listener     │
+      │ Transaction Consumer│
+      └──────────┬──────────┘
+                 │
+                 ▼
+      ┌─────────────────────┐
+      │ Transaction Domain  │
+      │      Object         │
+      └─────────────────────┘
+```
+
+This architecture ensures that every transaction entering the system first passes through a centralized event stream before becoming available to downstream business processes.
+
+### Kafka Consumer Implementation
+
+A dedicated Spring Kafka listener was implemented to subscribe dynamically to the configured transaction topic defined within the application configuration.
+
+```yaml
+general:
+  kafka-topic: trader-updates
+```
+
+By externalizing topic management through configuration, the application remains environment-agnostic and avoids hardcoded infrastructure dependencies.
+
+The listener is responsible for receiving every transaction event published to the configured topic and converting the incoming payload into the platform's Transaction domain model. Each transaction contains the information required to support future validation and processing workflows, including sender identifiers, recipient identifiers, and transaction amounts.
+
+### Serialization & Domain Mapping
+
+Message-driven architectures require a standardized mechanism for transmitting structured data across distributed systems. To facilitate this, JSON serialization and deserialization were integrated into the Kafka messaging pipeline.
+
+The event lifecycle now follows the flow:
+
+```text
+Transaction Object
+        │
+        ▼
+JSON Serialization
+        │
+        ▼
+Apache Kafka Event Stream
+        │
+        ▼
+JSON Deserialization
+        │
+        ▼
+Transaction Object
+```
+
+This process ensures that complex domain objects can be transmitted reliably through Kafka while preserving type safety and application-level consistency.
+
+### Validation & Testing
+
+To verify the correctness of the implementation, the consumer pipeline was tested using the embedded Kafka infrastructure provided within the project scaffold.
+
+Validation confirmed:
+
+* Successful topic subscription and consumer initialization.
+* Reliable consumption of transaction events from Kafka.
+* Accurate deserialization of incoming event payloads.
+* Correct conversion of event data into Transaction domain objects.
+* Successful execution of automated integration tests.
+
+Sample transaction events successfully consumed during verification included:
+
+```text
+Transaction {senderId=6, recipientId=7, amount=122.86}
+Transaction {senderId=5, recipientId=2, amount=42.87}
+Transaction {senderId=7, recipientId=4, amount=161.79}
+Transaction {senderId=8, recipientId=7, amount=22.22}
+```
+
+### Engineering Outcome
+
+The completion of this phase establishes the first operational processing layer within the Midas Core ecosystem. The platform is now capable of receiving and interpreting transaction events through a distributed messaging architecture, laying the groundwork for the next stages of development involving transaction validation, account verification, persistence management, balance reconciliation, and end-to-end financial transaction processing.
+
+With asynchronous event ingestion now fully operational, Midas Core possesses the messaging infrastructure necessary to evolve into a scalable, production-inspired financial transaction processing platform.
+
+---
+
 ## Repository Structure
 
 ```text
