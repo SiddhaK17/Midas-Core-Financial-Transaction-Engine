@@ -37,6 +37,7 @@ The repository documents the progressive implementation of the platform, beginni
 
 The platform is designed around a modular event-driven workflow that separates message ingestion, business validation, persistence, and service exposure into clearly defined architectural layers.
 
+```text
                         ┌─────────────────────┐
                         │ Transaction Source  │
                         └──────────┬──────────┘
