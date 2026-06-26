@@ -314,6 +314,188 @@ With asynchronous event ingestion now fully operational, Midas Core possesses th
 
 ---
 
+# Phase 3 — Transaction Validation, H2 Persistence & Financial Processing Engine
+
+## Objective
+
+With asynchronous message ingestion successfully established through Apache Kafka, the next milestone was to transform Midas Core into a functional transaction processing engine capable of validating, persisting, and maintaining financial data integrity.
+
+Receiving transaction events alone is insufficient for any production-grade financial platform. Every transaction must first undergo strict business validation before modifying account balances or being permanently recorded within the system.
+
+This phase introduces the persistence layer of the application by integrating an H2 in-memory relational database through Spring Data JPA and implementing the core business workflow responsible for processing financial transactions safely and consistently.
+
+---
+
+## Engineering Challenge
+
+Each incoming Kafka event now represents a potential financial operation between two users.
+
+Before any modification to the database is permitted, the application must guarantee that the transaction satisfies all predefined business constraints.
+
+Every incoming transaction is validated against three mandatory conditions:
+
+- The sender account must exist.
+- The recipient account must exist.
+- The sender must possess sufficient funds to complete the transfer.
+
+If any validation fails, the transaction is immediately discarded without altering account balances or generating database records.
+
+Only transactions satisfying every business rule are allowed to proceed through the processing pipeline.
+
+This validation-first approach mirrors how real-world financial systems prioritize consistency, integrity, and protection against invalid state transitions.
+
+---
+
+## Solution Architecture
+
+To support persistent financial processing, the application architecture was expanded beyond simple event consumption into a complete transactional workflow.
+
+```text
+                   Apache Kafka
+                         │
+                         ▼
+            KafkaTransactionListener
+                         │
+                         ▼
+                 DatabaseConduit
+                         │
+        ┌────────────────┴────────────────┐
+        ▼                                 ▼
+ UserRepository                 TransactionRepository
+        │                                 │
+        ▼                                 ▼
+    UserRecord                 TransactionRecord
+                │
+                ▼
+          H2 In-Memory Database
+```
+
+Rather than embedding business logic directly inside the Kafka listener, responsibility is delegated to a dedicated processing component.
+
+This separation ensures that messaging infrastructure remains isolated from domain logic while improving maintainability, extensibility, and overall architectural clarity.
+
+---
+
+## Core Financial Processing Workflow
+
+Every incoming transaction now follows a deterministic validation and persistence pipeline.
+
+```text
+Kafka Transaction Received
+            │
+            ▼
+Deserialize Transaction
+            │
+            ▼
+Locate Sender & Recipient
+            │
+            ▼
+Validate User Existence
+            │
+            ▼
+Validate Available Balance
+            │
+            ▼
+Reject Invalid Transactions
+            │
+            ▼
+Update Account Balances
+            │
+            ▼
+Persist Updated Users
+            │
+            ▼
+Create Transaction Record
+            │
+            ▼
+Store Transaction History
+```
+
+This workflow ensures that financial state changes occur only after successful validation, preventing inconsistent account balances and preserving transactional correctness.
+
+---
+
+## Relational Data Modeling
+
+To accurately represent financial transactions within a relational database, a dedicated `TransactionRecord` entity was introduced.
+
+Unlike the Kafka `Transaction` object—which represents a transient message travelling through the event stream—the new entity models a permanent database record capable of maintaining relationships with participating users.
+
+Each transaction maintains:
+
+- A many-to-one relationship with the sender account.
+- A many-to-one relationship with the recipient account.
+- The transferred monetary amount.
+- A unique generated identifier.
+
+This normalized data model allows multiple transactions to reference the same user while preserving a complete and queryable transaction history.
+
+---
+
+## Business Validation Engine
+
+The transaction processing engine now enforces the application's financial rules before committing any database changes.
+
+Implemented validation logic includes:
+
+- Verification of sender account existence.
+- Verification of recipient account existence.
+- Balance sufficiency checks before every transfer.
+- Immediate rejection of invalid transactions.
+- Prevention of unauthorized balance modifications.
+- Guaranteed persistence only for valid financial operations.
+
+This validation layer forms the foundation of the application's financial integrity model.
+
+---
+
+## Persistence Layer
+
+Spring Data JPA repositories were introduced to abstract all database interaction.
+
+Two dedicated repositories now manage the application's persistence layer:
+
+| Repository | Responsibility |
+|------------|----------------|
+| UserRepository | Retrieves and updates account information |
+| TransactionRepository | Persists validated financial transactions |
+
+By leveraging Spring Data JPA, the application avoids manual SQL while maintaining a clean repository-driven architecture that can later be migrated to production-grade databases with minimal changes.
+
+---
+
+## Key Engineering Enhancements
+
+During this phase, the platform gained several significant architectural capabilities:
+
+- Integrated H2 as an embedded relational database for development and automated testing.
+- Implemented Spring Data JPA persistence across user and transaction entities.
+- Designed a normalized transaction data model using entity relationships.
+- Developed the complete transaction validation engine.
+- Implemented automated balance reconciliation for sender and recipient accounts.
+- Persisted financial transaction history after successful validation.
+- Extended the existing processing layer while preserving compatibility with the original project scaffold.
+- Maintained a clear separation between event ingestion, business logic, and persistence responsibilities.
+
+---
+
+## Outcome
+
+At the conclusion of this milestone, Midas Core evolves beyond an event consumer into a fully functional backend transaction processor.
+
+The platform is now capable of:
+
+- Receiving financial events through Apache Kafka.
+- Validating every transaction against business rules.
+- Rejecting invalid financial operations.
+- Updating account balances atomically.
+- Persisting users and transaction history within a relational database.
+- Maintaining transactional consistency across the application.
+
+This phase establishes the application's financial persistence layer and provides the architectural foundation required for future capabilities such as REST APIs, reporting services, transaction querying, audit trails, and production database integration.
+
+---
+
 ## Repository Structure
 
 ```text
